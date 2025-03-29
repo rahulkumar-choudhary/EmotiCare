@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Face Verification | EmotiCare</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: linear-gradient(to right, #e3f2fd, #f3e5f5);
+      padding: 40px;
+    }
+
+    video {
+      width: 480px;
+      height: auto;
+      border: 3px solid #3f51b5;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background-color: #3f51b5;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h2>🎥 Face Verification</h2>
+  <p>Please look at the camera. This will only take a few seconds.</p>
+
+  <video id="webcam" autoplay muted playsinline></video><br />
+  <button id="startBtn">Start Face Scan</button>
+  <p id="status"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
+
+  <script>
+    const video = document.getElementById("webcam");
+    const status = document.getElementById("status");
+    const startBtn = document.getElementById("startBtn");
+    let model;
+
+    async function setupCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 480, height: 360 },
+        audio: false,
+      });
+      video.srcObject = stream;
+      return new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          resolve(video);
+        };
+      });
+    }
+
+    async function loadModel() {
+      model = await blazeface.load();
+    }
+
+    async function detectFaces() {
+      const startTime = Date.now();
+      status.innerText = "Scanning for face...";
+      startBtn.disabled = true;
+
+      const interval = setInterval(async () => {
+        const predictions = await model.estimateFaces(video, false);
+
+        if (predictions.length > 0) {
+          clearInterval(interval);
+          status.innerText = "✅ Face detected! Redirecting to EmotiCare...";
+          setTimeout(() => {
+            window.location.href = "/chat";
+          }, 2000);
+        } else if (Date.now() - startTime > 30000) {
+          clearInterval(interval);
+          status.innerText = "❌ No face detected in 30 seconds. Please try again.";
+          startBtn.disabled = false;
+        }
+      }, 1000);
+    }
+
+    window.onload = async () => {
+      await setupCamera();
+      await loadModel();
+    };
+
+    startBtn.onclick = detectFaces;
+  </script>
+</body>
+</html>
