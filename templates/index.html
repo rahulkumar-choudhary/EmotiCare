@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EmotiCare - Your Mental Health Companion</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1><span class="logo">🧠 EmotiCare</span></h1>
+    <p class="tagline">Your 24/7 emotional support assistant</p>
+    <div class="chat-box" id="chat-box"></div>
+    <div class="input-row">
+      <input type="text" id="user-input" placeholder="How are you feeling today?" onkeypress="handleKeyPress(event)" />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <div style="margin-top: 10px;">
+      <label><input type="checkbox" id="voice-toggle" checked> 🔊 Speak Responses</label>
+    </div>
+
+    <div id="find-resources" style="margin-top: 15px; text-align: center;">
+      <button onclick="getUserLocation()">📍 Use My Location</button>
+    </div>
+
+    <div class="resources" id="resource-box" style="display:none;">
+      <h3>🗺️ Therapists Near You</h3>
+      <div id="resource-list"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentDisorder = "";
+
+    async function sendMessage() {
+      const inputField = document.getElementById("user-input");
+      const input = inputField.value;
+      const box = document.getElementById("chat-box");
+      const speak = document.getElementById("voice-toggle").checked;
+
+      if (!input.trim()) return;
+
+      box.innerHTML += `<div class="user"><b>You:</b> ${input}</div>`;
+      inputField.disabled = true;
+
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ message: input })
+      });
+
+      const data = await res.json();
+      box.innerHTML += `<div class="bot"><b>EmotiCare:</b> ${data.response}</div>`;
+
+      if (speak && 'speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(data.response);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.volume = 0.9;
+        speechSynthesis.speak(utterance);
+      }
+
+      inputField.value = "";
+      inputField.disabled = false;
+      inputField.focus();
+
+      currentDisorder = data.disorder;
+    }
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function getUserLocation() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            const location = `${lat},${lng}`;
+            getResources(location);
+          },
+          () => {
+            alert("Location access denied. Please enter manually.");
+          }
+        );
+      } else {
+        alert("Geolocation is not supported by your browser.");
+      }
+    }
+
+    async function getResources(location) {
+      const res = await fetch('/resources', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ disorder: currentDisorder, location })
+      });
+
+      const data = await res.json();
+      const resourceBox = document.getElementById("resource-box");
+      const list = document.getElementById("resource-list");
+      list.innerHTML = "";
+
+      data.resources.forEach(r => {
+        list.innerHTML += `
+          <div class="resource-card">
+            <strong>${r.name}</strong><br>
+            ${r.address} <br>
+            ⭐ Rating: ${r.rating}
+          </div>
+        `;
+      });
+
+      resourceBox.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
